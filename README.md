@@ -2,12 +2,19 @@
 
 Calculates how two or more filesystem trees are similar. Usage:
 
-    go run github.com/lzap/walkalike@latest dir1 dir2
+    go run github.com/lzap/walkalike/cmd dir1 dirN
 
 Example output:
 
 ```
-go run github.com/lzap/walkalike@latest testdata/a testdata/b testdata/c
+go run github.com/lzap/walkalike/cmd testdata/a testdata/b
+0.44444444 testdata/a testdata/b
+```
+
+When multiple directories are provided, the first directory is compared against 2nd, 3rd and so on.
+
+```
+go run github.com/lzap/walkalike/cmd testdata/a testdata/b testdata/c
 0.44444444 testdata/a testdata/b
 0.96296296 testdata/a testdata/c
 ```
@@ -23,8 +30,6 @@ Three columns are printed out:
 * Similarity (number between 0 and 1)
 * Directory A
 * Directory B
-
-When multiple directories are provided, the first directory is compared against 2nd, 3rd and so on.
 
 ### Implementation
 

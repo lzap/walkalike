@@ -1,14 +1,11 @@
 package walkalike
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"io/fs"
 	"os"
 	"sync"
-
-	"github.com/gnabgib/go-cksum"
 )
 
 type Indexer struct {
@@ -71,7 +68,7 @@ func (i *Indexer) processFiles(ctx context.Context) {
 			}
 
 			// write path to hash
-			pathCRC, _, _ := cksum.Bytes([]byte(entry.path))
+			pathChecksum := ChecksumPath(entry.path)
 
 			// open the file
 			f, err := i.root.Open(entry.path)
@@ -81,8 +78,7 @@ func (i *Indexer) processFiles(ctx context.Context) {
 			}
 
 			// calculate the hash
-			in := bufio.NewReader(f)
-			contentCRC, size, err := cksum.Stream(in)
+			contentChecksum, size, err := ChecksumReader(f)
 			if err != nil {
 				i.ErrFn(entry.path, err)
 				f.Close()
@@ -98,7 +94,7 @@ func (i *Indexer) processFiles(ctx context.Context) {
 			f.Close()
 
 			// append to the index
-			i.ix.Add(pathCRC, contentCRC)
+			i.ix.Add(pathChecksum, contentChecksum)
 
 		case <-ctx.Done():
 			return

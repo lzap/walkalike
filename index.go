@@ -5,8 +5,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
-	"slices"
-	"sort"
 )
 
 type Index struct {
@@ -31,53 +29,23 @@ func (ix *Index) Add(pathHash, contentHash uint32) {
 	})
 }
 
-// ComparePaths compares two tokens by their path hash.
-func ComparePaths(a, b Token) int {
-	if a.PathHash > b.PathHash {
-		return 1
-	} else if a.PathHash < b.PathHash {
-		return -1
-	}
-	return 0
-}
-
-// CompareContent compares two tokens by their content hash.
-func CompareContent(a, b Token) int {
-	if a.ContentHash > b.ContentHash {
-		return 1
-	} else if a.ContentHash < b.ContentHash {
-		return -1
-	}
-	return 0
-}
-
-func SortByPaths(t []Token) []Token {
-	res := make([]Token, len(t))
-	copy(res, t)
-
-	slices.SortFunc(res, func(i, j Token) int {
-		return ComparePaths(i, j)
-	})
-	return res
-}
-
-func SortByContent(t []Token) []Token {
-	res := make([]Token, len(t))
-	copy(res, t)
-
-	slices.SortFunc(res, func(i, j Token) int {
-		return CompareContent(i, j)
-	})
-	return res
+// Size returns the number of tokens in the index.
+func (ix *Index) Size() int {
+	return len(ix.Tokens)
 }
 
 // Encode encodes the index using gob and compresses it using gzip.
-func (ix *Index) Encode(w io.Writer) error {
+func (ix *Index) Encode(w io.Writer, filename string) error {
 	nix := &Index{
 		Tokens: SortByPaths(ix.Tokens),
 	}
 
 	gzw := gzip.NewWriter(w)
+	defer gzw.Close()
+	gzw.Name = filename
+	gzw.Comment = "walkalike index v1"
+	gzw.Extra = []byte{0x01} // format version
+
 	return gob.NewEncoder(gzw).Encode(nix)
 }
 
@@ -100,85 +68,4 @@ func (ix *Index) String() string {
 
 func (t Token) String() string {
 	return fmt.Sprintf("%x:%x", t.PathHash, t.ContentHash)
-}
-
-// IntersectContent computes the intersection of two sets of tokens by file content.
-// It returns a slice of tokens that are present in both sets.
-// Index MUST be sorted before calling this function.
-// The result is sorted in the same order as the original index.
-func (ix *Index) IntersectContent(b []Token) []Token {
-	a := ix.Tokens
-	b = SortByContent(b)
-	blen := len(b)
-	res := make([]Token, 0, len(a))
-
-	for i := range a {
-		_, found := sort.Find(blen, func(j int) int {
-			return CompareContent(a[i], b[j])
-		})
-
-		if found {
-			res = append(res, a[i])
-		}
-	}
-
-	return res
-}
-
-// IntersectPaths computes the intersection of two sets of tokens by file paths.
-// It returns a slice of tokens that are present in both sets.
-// Index MUST be sorted before calling this function.
-// The result is sorted in the same order as the original index.
-func (ix *Index) IntersectPaths(b []Token) []Token {
-	a := ix.Tokens
-	b = SortByPaths(b)
-	blen := len(b)
-	res := make([]Token, 0, len(a))
-
-	for i := range a {
-		_, found := sort.Find(blen, func(j int) int {
-			return ComparePaths(a[i], b[j])
-		})
-
-		if found {
-			res = append(res, a[i])
-		}
-	}
-
-	return res
-}
-
-/*
-func (ix *Index) UnionPaths(b []Token) []Token {
-	a := ix.Tokens
-	res := make([]Token, 0, len(a)+len(b))
-	res = append(res, a...)
-	res = append(res, b...)
-	slices.SortFunc(res, func(i, j Token) int {
-		return ComparePaths(i, j)
-	})
-	return slices.CompactFunc(res, func(i, j Token) bool {
-		return ComparePaths(i, j) == 0
-	})
-}
-*/
-
-// Similarity computes the Jaccard similarity between two indices by file paths.
-//
-// https://en.wikipedia.org/wiki/Jaccard_index
-func (ix *Index) PathSimilarityJaccard(other *Index) float64 {
-	intersect := ix.IntersectPaths(other.Tokens)
-	union := len(ix.Tokens) + len(other.Tokens) - len(intersect)
-
-	return float64(len(intersect)) / float64(union)
-}
-
-// Similarity computes the Jaccard similarity between two indices by file content.
-//
-// https://en.wikipedia.org/wiki/Jaccard_index
-func (ix *Index) ContentSimilarityJaccard(other *Index) float64 {
-	intersect := ix.IntersectContent(other.Tokens)
-	union := len(ix.Tokens) + len(other.Tokens) - len(intersect)
-
-	return float64(len(intersect)) / float64(union)
 }

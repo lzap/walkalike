@@ -1,6 +1,7 @@
 package walkalike
 
 import (
+	"fmt"
 	"math"
 	"testing"
 )
@@ -22,8 +23,16 @@ var (
 		{PathHash: 3, ContentHash: 3},
 	}
 
+	t1 = []Token{
+		{PathHash: 1, ContentHash: 1},
+	}
+
 	t2 = []Token{
 		{PathHash: 2, ContentHash: 2},
+	}
+
+	t3 = []Token{
+		{PathHash: 3, ContentHash: 3},
 	}
 )
 
@@ -31,45 +40,41 @@ func almostEqual(a, b float64) bool {
 	return math.Abs(a-b) <= 0.01
 }
 
-func TestIntersectPaths(t *testing.T) {
+func TestIntersect(t *testing.T) {
 	t.Parallel()
 
-	a := t12
-	b := t23
-	expected := t2
-
-	ix := &Index{Tokens: a}
-	result := ix.IntersectPaths(b)
-
-	if len(result) != len(expected) {
-		t.Errorf("Expected %d tokens, got %d", len(expected), len(result))
+	tests := []struct {
+		a, b, expected []Token
+		cmp            func(a, b Token) int
+	}{
+		{t12, t23, t2, CompareContent},
+		{t12, t123, t12, CompareContent},
+		{t12, t2, t2, CompareContent},
+		{t123, t12, t12, CompareContent},
+		{t123, t23, t23, CompareContent},
+		{t123, t1, t1, CompareContent},
+		{t123, t2, t2, CompareContent},
+		{t123, t3, t3, CompareContent},
+		{t123, []Token{}, []Token{}, CompareContent},
+		{t12, t23, t2, ComparePaths},
+		{t12, t123, t12, ComparePaths},
+		{t12, t2, t2, ComparePaths},
 	}
 
-	for i, token := range result {
-		if token != expected[i] {
-			t.Errorf("Expected token %v, got %v", expected[i], token)
-		}
-	}
-}
+	for ti, tst := range tests {
+		t.Run(fmt.Sprintf("%d", ti), func(t *testing.T) {
+			result := Intersect(tst.a, tst.b, CompareContent)
 
-func TestIntersectContent(t *testing.T) {
-	t.Parallel()
+			if len(result) != len(tst.expected) {
+				t.Errorf("Expected %d tokens, got %d", len(tst.expected), len(result))
+			}
 
-	a := t12
-	b := t23
-	expected := t2
-
-	ix := &Index{Tokens: a}
-	result := ix.IntersectContent(b)
-
-	if len(result) != len(expected) {
-		t.Errorf("Expected %d tokens, got %d", len(expected), len(result))
-	}
-
-	for i, token := range result {
-		if token != expected[i] {
-			t.Errorf("Expected token %v, got %v", expected[i], token)
-		}
+			for i, token := range result {
+				if token != tst.expected[i] {
+					t.Errorf("Expected token %v, got %v", tst.expected[i], token)
+				}
+			}
+		})
 	}
 }
 
@@ -94,13 +99,8 @@ func TestSimilarityJaccard(t *testing.T) {
 	for _, test := range tests {
 		aix := &Index{Tokens: test.a}
 		bix := &Index{Tokens: test.b}
-
-		result := aix.ContentSimilarityJaccard(bix)
-		if !almostEqual(result, test.expected) {
-			t.Errorf("Expected similarity %f, got %f", test.expected, result)
-		}
-
-		result = aix.PathSimilarityJaccard(bix)
+		result := SimilarityJaccard(aix, bix).Similarity
+		
 		if !almostEqual(result, test.expected) {
 			t.Errorf("Expected similarity %f, got %f", test.expected, result)
 		}

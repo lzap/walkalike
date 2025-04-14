@@ -1,2 +1,2 @@
-github.com/s0rg/set v1.2.1 h1:OMm/sxnO0tIqINEFdr7RbvMWLEFrdleNOuoEQNMTnGk=
-github.com/s0rg/set v1.2.1/go.mod h1:/7U/8G00WOM4Nhlww3hXj7Q96Pw+bFinc17N5sh0l8E=
+github.com/gnabgib/go-cksum v0.0.0-20200823023223-c900aeacdb2f h1:0Ks0wgGOTbl7qDRvj/cMP1cyYLFoI84n5aatd2wt1KU=
+github.com/gnabgib/go-cksum v0.0.0-20200823023223-c900aeacdb2f/go.mod h1:pssTJLNq+ltDEAiUfhvxW/lecB8kyIdEO6L1DWehT04=

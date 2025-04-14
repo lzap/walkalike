@@ -1,12 +1,14 @@
 package walkalike
 
 import (
+	"bufio"
 	"context"
-	"encoding/binary"
-	"hash/crc64"
+	"errors"
 	"io/fs"
 	"os"
 	"sync"
+
+	"github.com/gnabgib/go-cksum"
 )
 
 type Indexer struct {
@@ -46,11 +48,6 @@ func (i *Indexer) processFiles(ctx context.Context) {
 	defer i.wg.Done()
 
 	emtyEntry := item{}
-
-	// hash is shared since only one goroutine is writing to it
-	table := crc64.MakeTable(crc64.ECMA)
-	h := crc64.New(table)
-
 	for {
 		select {
 		case entry := <-i.q:
@@ -61,9 +58,6 @@ func (i *Indexer) processFiles(ctx context.Context) {
 			if entry.info.IsDir() {
 				continue
 			}
-
-			// prepare the hash
-			h.Reset()
 
 			// get the file info
 			info, err := entry.info.Info()
@@ -77,19 +71,7 @@ func (i *Indexer) processFiles(ctx context.Context) {
 			}
 
 			// write path to hash
-			h.Write([]byte(entry.path))
-
-			// write file size to hash
-			if info.Size() > 0 {
-				err := binary.Write(h, binary.NativeEndian, info.Size())
-				if err != nil {
-					i.ErrFn(entry.path, err)
-					continue
-				}
-			} else {
-				// zero-sized files are not indexed
-				continue
-			}
+			pathCRC, _, _ := cksum.Bytes([]byte(entry.path))
 
 			// open the file
 			f, err := i.root.Open(entry.path)
@@ -98,29 +80,25 @@ func (i *Indexer) processFiles(ctx context.Context) {
 				continue
 			}
 
-			// read the first block
-			buf := make([]byte, 4096)
-			n, err := f.Read(buf)
+			// calculate the hash
+			in := bufio.NewReader(f)
+			contentCRC, size, err := cksum.Stream(in)
 			if err != nil {
 				i.ErrFn(entry.path, err)
 				f.Close()
 				continue
 			}
 
-			// write the first block to the hash
-			if n > 0 {
-				err := binary.Write(h, binary.NativeEndian, buf[:n])
-				if err != nil {
-					i.ErrFn(entry.path, err)
-					f.Close()
-					continue
-				}
+			if int64(size) != info.Size() {
+				i.ErrFn(entry.path, errors.New("size mismatch while calculating crc32"))
+				f.Close()
+				continue
 			}
 
 			f.Close()
 
 			// append to the index
-			i.ix.Tokens = append(i.ix.Tokens, Token(h.Sum64()))
+			i.ix.Add(pathCRC, contentCRC)
 
 		case <-ctx.Done():
 			return

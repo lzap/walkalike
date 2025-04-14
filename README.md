@@ -19,9 +19,28 @@ go run github.com/lzap/walkalike/cmd testdata/a testdata/b testdata/c
 0.96296296 testdata/a testdata/c
 ```
 
+When a same directory is passed, the similarity is 1:
+
+```
+go run github.com/lzap/walkalike/cmd /usr/lib /usr/lib
+1.00000000 /usr/lib /usr/lib
+```
+
 ### Download binary
 
 Use releases page on github to download binary for your OS and architecture.
+
+### Files support
+
+The tool support listing files inside OS images:
+
+    sudo dnf -f install guestfs-tools
+
+### Building
+
+To build the project:
+
+    go build ./cmd
 
 ### Output
 
@@ -33,7 +52,7 @@ Three columns are printed out:
 
 ### Implementation
 
-The directory tree is walked in lexicographic order and CRC64 is calculated for each file path, size and the initial 4096 bytes of data. This list of CRC64 values, also called `index`, is used to perform similarity comparison.
+The directory tree is walked and two CRC32 hashes (compatible with [cksum](https://github.com/coreutils/coreutils/blob/master/src/cksum.c)) are calculated for each file: absolute file path and file contents. Then the list of the CRC pairs is sorted by the file path hash ans stored as `index` which is used to perform similarity comparison.
 
 Currently Jaccard similarity approach is used to calculate the final value. This may be configurable in the future as other algorithms are added.
 
@@ -45,3 +64,5 @@ This repository is a Go library that can be used to achieve the same thing.
 
 * write guestfs wrapper for OS images
 * inspect how this can be turned into RAG (Retrival Augmented Generation)
+* validate the golang CRC32 is equal to `cksum` CRC 32 implementation
+* 

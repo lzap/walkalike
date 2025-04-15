@@ -5,10 +5,13 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"sync"
 )
 
 type Index struct {
 	Tokens []Token
+
+	m sync.Mutex
 }
 
 type Token struct {
@@ -21,8 +24,11 @@ func init() {
 	gob.Register(&Token{})
 }
 
-// Add adds a new token to the index.
+// Add adds a new token to the index. This function is thread-safe.
 func (ix *Index) Add(pathHash, contentHash uint32) {
+	ix.m.Lock()
+	defer ix.m.Unlock()
+
 	ix.Tokens = append(ix.Tokens, Token{
 		PathHash:    pathHash,
 		ContentHash: contentHash,

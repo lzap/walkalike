@@ -4,7 +4,7 @@ Calculates how two or more filesystem trees (or OS images) are similar by applyi
 
     go run github.com/lzap/walkalike/cmd dir1 dirN
 
-Example output:
+Processing is optimized for SSDs and index creation is parallelized. Example command:
 
     go run github.com/lzap/walkalike/cmd testdata/a testdata/b
 

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -108,14 +109,12 @@ func (i *Indexer) processFiles(ctx context.Context) {
 }
 
 // Build walks the directory tree rooted at root and builds the index.
-// It returns the index and an error if one occurs. The index is built
-// in lexicographic order of the file paths and keeps duplicate tokens.
+// It returns the index and an error if one occurs.
 func (i *Indexer) Build(ctx context.Context) (*Index, error) {
-	// There must be exactly one goroutine that reads from the channel
-	// because files must be processed in the order they are walked by
-	// the deterministic WalkDir function.
-	i.wg.Add(1)
-	go i.processFiles(ctx)
+	for range runtime.NumCPU() {
+		i.wg.Add(1)
+		go i.processFiles(ctx)
+	}
 
 	err := fs.WalkDir(os.DirFS(i.root), ".", func(path string, d os.DirEntry, err error) error {
 		// report errors but continue walking

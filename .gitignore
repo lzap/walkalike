@@ -6,3 +6,5 @@
 /*tar.gz
 /*tar.bz2
 /*tar
+# Added by goreleaser init:
+dist/

@@ -27,6 +27,8 @@ When the same directory is passed twice:
 
 Similarity must be 1.0:
 
+    1.0000000000000 /usr/lib /usr/lib
+
 ### OS images support
 
 The tool support listing files inside OS images, it requires the tool `virt-ls` to be installed:
@@ -53,7 +55,7 @@ Three columns are printed out:
 
 Indices for OS images are kept in cache (`$HOME/.cache/walkalike`) so further processing will be fast. Directories are never kept in cache however.
 
-Index size is relatively small, for an OS image of about 35k files about 500kB index is created. The rough estimation is 16 bytes per file entry (35000*16), files are compressed with gzip which brings the size down by about 20%.
+Index size is relatively small, for an OS image of about 35k files about 500kB index is created. The rough estimation is 16 bytes per file entry, files are compressed with gzip which brings the size down by about 20%.
 
 ### Implementation
 

@@ -27,14 +27,7 @@ func ChecksumPath(s string) uint32 {
 }
 
 func ChecksumReader(r io.Reader) (uint32, int, error) {
-	in := bufio.NewReader(r)
-
-	crc, size, err := cksum.Stream(in)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return crc, size, nil
+	return cksum.Stream(bufio.NewReader(r))
 }
 
 func ChecksumCache(path string, size int64, modTime time.Time) (string, error) {
@@ -45,6 +38,7 @@ func ChecksumCache(path string, size int64, modTime time.Time) (string, error) {
 
 	h := crc64.New(crc64.MakeTable(crc64.ECMA))
 	h.Write([]byte(absPath))
+	h.Write([]byte(BuildID()))
 
 	bSize := make([]byte, 8)
 	binary.NativeEndian.PutUint64(bSize, uint64(size))

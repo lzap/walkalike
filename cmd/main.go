@@ -24,9 +24,8 @@ func indexForDir(ctx context.Context, path string) (*walkalike.Index, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", path)
 	}
-	root := os.DirFS(path)
 
-	indexer := walkalike.NewIndexer(root)
+	indexer := walkalike.NewIndexer(path)
 	indexer.ErrFn = func(path string, err error) {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 	}
@@ -41,7 +40,7 @@ func indexForDir(ctx context.Context, path string) (*walkalike.Index, error) {
 
 func indexForFile(ctx context.Context, path string) (*walkalike.Index, error) {
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "Executing 'virt-ls' command")
+		fmt.Fprintf(os.Stderr, "Executing 'virt-ls' command on %s\n", path)
 	}
 	cmd := exec.CommandContext(ctx, "virt-ls",
 		"--csv",

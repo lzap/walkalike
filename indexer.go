@@ -3,31 +3,28 @@ package walkalike
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
 type Indexer struct {
 	// ErrFn is called when an error occurs during indexing. The first argument
 	// is the path of the file that caused the error, and the second argument
-	// is the error itself.
+	// is the error itself. The function can be called from multiple goroutines.
 	ErrFn func(string, error)
 
-	root fs.FS
+	root string
 	ix   *Index
 	wg   *sync.WaitGroup
-	q    chan item
-}
-
-type item struct {
-	path string
-	info os.DirEntry
+	q    chan string
 }
 
 // NewIndexer creates a new Indexer. The root argument is the root of the
 // directory tree to be indexed.
-func NewIndexer(root fs.FS) *Indexer {
+func NewIndexer(root string) *Indexer {
 	return &Indexer{
 		ErrFn: func(path string, err error) {
 			// Default error function does nothing
@@ -37,64 +34,72 @@ func NewIndexer(root fs.FS) *Indexer {
 			Tokens: make([]Token, 0, 1024),
 		},
 		wg: &sync.WaitGroup{},
-		q:  make(chan item, 1024),
+		q:  make(chan string, 1024),
 	}
+}
+
+var ErrChecksumSizeMismatch = errors.New("checksum size mismatch")
+
+func (i *Indexer) processFile(ctx context.Context, path string) {
+	// get the file info
+	stat, err := os.Lstat(path)
+	if err != nil {
+		i.ErrFn(path, err)
+		return
+	}
+
+	// calculate path checksum
+	pathChecksum := ChecksumPath(path)
+
+	// resolve symlinks
+	if stat.Mode()&os.ModeSymlink != 0 {
+		dst, err := os.Readlink(path)
+		if err != nil {
+			i.ErrFn(path, err)
+			return
+		}
+
+		contentChecksum := ChecksumPath(dst)
+		i.ix.Add(pathChecksum, contentChecksum)
+		return
+	}
+
+	// open the file
+	f, err := os.Open(path)
+	if err != nil {
+		i.ErrFn(path, err)
+		return
+	}
+	defer f.Close()
+
+	// calculate content checksum
+	contentChecksum, size, err := ChecksumReader(f)
+	if err != nil {
+		i.ErrFn(path, err)
+		return
+	}
+	f.Close()
+
+	if int64(size) != stat.Size() {
+		i.ErrFn(path, fmt.Errorf("%w: %d vs %d", ErrChecksumSizeMismatch, size, stat.Size()))
+		return
+	}
+
+	// append to the index
+	i.ix.Add(pathChecksum, contentChecksum)
 }
 
 func (i *Indexer) processFiles(ctx context.Context) {
 	defer i.wg.Done()
 
-	emtyEntry := item{}
 	for {
 		select {
-		case entry := <-i.q:
-			if entry == emtyEntry {
+		case path := <-i.q:
+			if path == "" {
 				return
 			}
 
-			if entry.info.IsDir() {
-				continue
-			}
-
-			// get the file info
-			info, err := entry.info.Info()
-			if err != nil {
-				i.ErrFn(entry.path, err)
-				continue
-			}
-
-			if info.IsDir() {
-				continue
-			}
-
-			// write path to hash
-			pathChecksum := ChecksumPath(entry.path)
-
-			// open the file
-			f, err := i.root.Open(entry.path)
-			if err != nil {
-				i.ErrFn(entry.path, err)
-				continue
-			}
-
-			// calculate the hash
-			contentChecksum, size, err := ChecksumReader(f)
-			if err != nil {
-				i.ErrFn(entry.path, err)
-				f.Close()
-				continue
-			}
-
-			if int64(size) != info.Size() {
-				i.ErrFn(entry.path, errors.New("size mismatch while calculating crc32"))
-				f.Close()
-				continue
-			}
-
-			f.Close()
-
-			// append to the index
-			i.ix.Add(pathChecksum, contentChecksum)
+			i.processFile(ctx, path)
 
 		case <-ctx.Done():
 			return
@@ -112,22 +117,21 @@ func (i *Indexer) Build(ctx context.Context) (*Index, error) {
 	i.wg.Add(1)
 	go i.processFiles(ctx)
 
-	err := fs.WalkDir(i.root, ".", func(path string, d os.DirEntry, err error) error {
+	err := fs.WalkDir(os.DirFS(i.root), ".", func(path string, d os.DirEntry, err error) error {
+		// report errors but continue walking
 		if err != nil {
 			i.ErrFn(path, err)
-			// continue walking
 			return nil
 		}
 
+		// skip directories
 		if d.IsDir() {
 			return nil
 		}
 
-		item := item{
-			path: path,
-			info: d,
-		}
-		i.q <- item
+		// send for processing
+		cleanPath, err := filepath.Abs(filepath.Join(i.root, path))
+		i.q <- cleanPath
 
 		return nil
 	})

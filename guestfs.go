@@ -41,19 +41,25 @@ func (gr *GuestfsLSCSV) ReadAll() error {
 		cksum := record[3]
 		path := record[4]
 
+		var contentChecksum uint32
+
 		// skip directories or symlinks
 		if ftype != "-" {
 			continue
+		} else if ftype == "l" {
+			dst := record[5]
+			contentChecksum = ChecksumPath(dst)
+		} else {
+			// retular file
+			cksum64, err := strconv.ParseUint(cksum, 10, 32)
+			if err != nil {
+				return err
+			}
+
+			contentChecksum = uint32(cksum64)
 		}
 
-		cksum64, err := strconv.ParseUint(cksum, 10, 32)
-		if err != nil {
-			return err
-		}
-
-		contentChecksum := uint32(cksum64)
 		pathChecksum := ChecksumPath(path)
-
 		gr.ix.Add(pathChecksum, contentChecksum)
 	}
 

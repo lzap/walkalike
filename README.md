@@ -48,8 +48,8 @@ Building the indices will take a little bit more time as walking the tree is not
 Three columns are printed out:
 
 * Similarity (number between 0 and 1)
-* Directory A
-* Directory B
+* Directory/OS image A
+* Directory/OS image B
 
 ### Index cache
 
